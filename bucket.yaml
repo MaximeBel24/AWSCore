@@ -1,0 +1,28 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Bucket S3 parametrer avec tags
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: Nom du bucket S3
+  Environnement:
+    Type: String
+    AllowedValues: [prod, uat, dev]
+    Default: dev
+    Description: Environnement (prod, uat, dev)
+
+Resources:
+  MonBucketS3:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref BucketName
+      Tags:
+        - Key: Name
+          Value: !Sub "awscore-s3-${Environnement}"
+        - Key: Environnement
+          Value: !Ref Environnement
+
+Outputs:
+  NomDuBucket:
+    Description: Nom du bucket créé
+    Value: !Ref MonBucketS3
