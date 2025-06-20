@@ -1,0 +1,102 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: VPC avec CIDR et tags en parametrer
+
+Parameters: 
+  VpcName:
+    Type: String
+    Description: Nom du VPC 
+
+  Environnement:
+    Type: String
+    AllowedValues: [prod, uat, dev]
+    Default: dev
+    Description: Envirtonnement cible
+
+  VpcCidr:
+    Type: String
+    Default: 10.0.0.0/16
+    Description: CIDR du VPC
+
+  SubnetName:
+    Type: String
+    Description: Nom du Subnet
+  
+  SubnetCidr:
+    Type: String
+    Default: 10.0.1.0/24
+    Description: CIDR du subnet 
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref VpcName
+        - Key: Environnement
+          Value: !Ref Environnement
+
+  Subnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref SubnetCidr
+      AvailabilityZone: !Select [ 0, !GetAZs ""]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Ref SubnetName
+        - Key: Environnement
+          Value: !Ref Environnement
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties: 
+      Tags:
+        - Key: Name
+          Value: !Sub "${VpcName}-igw"
+        - Key: Environnement
+          Value: !Ref Environnement
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: 
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub "${VpcName}-rtb"
+        - Key: Environnement
+          Value: !Ref Environnement
+
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Subnet
+      RouteTableId: !Ref RouteTable
+
+
+Outputs:
+  VpcCidr:
+    Description: Cidr du VPC créé
+    Value: !Ref Vpc
+  VpcId:
+    Description: ID du VPC créé
+    Value: !Ref Vpc
+    Export:
+      Name: !Sub "${AWS::StackName}-VpcId"

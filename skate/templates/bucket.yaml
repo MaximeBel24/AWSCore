@@ -12,7 +12,7 @@ Parameters:
     Description: Environnement (prod, uat, dev)
 
 Resources:
-  MonBucketS3:
+  S3Bucket:
     Type: AWS::S3::Bucket
     Properties:
       BucketName: !Ref BucketName
