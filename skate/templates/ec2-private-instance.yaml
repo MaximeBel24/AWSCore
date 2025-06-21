@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Laucnh an EC2 instance in a private subnet
+
+Parameters:
+  Environnement:
+    Type: String
+    AllowedValues: [prod, uat, dev]
+    Default: uat
+    Description: Target
+
+  KeyName:
+    Type: String
+    Description: Name of an existing EC2 KeyPair to enable SSH access
+
+  VpcStackName:
+    Type: String
+    Description: VPC stack's name to import
+
+  PrivateSubnetId:
+    Type: String
+    Description: The ID of the private subnet
+
+  VpcId:
+    Type: String
+    Description: The ID of the VPC
+
+Resources:
+  PrivateSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH from bastion only
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        SourceSecurityGroupId: !ImportValue
+          Fn::Sub: "bastion-uat-BastionSG"
+      Tags:
+        - Key: Name
+          Value: !Sub private-${Environnement}-sg
+        - Key: Environment
+          Value: !Ref Environnement
+
+  PrivateHost:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      KeyName: !Ref KeyName
+      ImageId: ami-0caad95876a4611ee  # Amazon Linux 2023 (Paris)
+      SubnetId: !Ref PrivateSubnetId
+      SecurityGroupIds:
+        - !Ref PrivateSG
+      Tags:
+        - Key: Name
+          Value: !Sub private-${Environnement}
+        - Key: Environment
+          Value: !Ref Environnement
+
+  
