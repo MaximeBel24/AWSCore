@@ -1,16 +1,16 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Description: VPC avec CIDR et tags en parametrer
 
-Parameters: 
+Parameters:
   VpcName:
     Type: String
-    Description: Nom du VPC 
+    Description: Nom du VPC
 
-  Environnement:
+  Environment:
     Type: String
     AllowedValues: [prod, uat, dev]
     Default: dev
-    Description: Envirtonnement cible
+    Description: Environnement cible
 
   VpcCidr:
     Type: String
@@ -19,12 +19,16 @@ Parameters:
 
   SubnetName:
     Type: String
-    Description: Nom du Subnet
-  
+    Description: Nom du Subnet public
+
+  PrivateSubnetName:
+    Type: String
+    Description: Nom du Subnet privé
+
   SubnetCidr:
     Type: String
     Default: 10.0.1.0/24
-    Description: CIDR du subnet 
+    Description: CIDR du subnet
 
 Resources:
   Vpc:
@@ -37,33 +41,47 @@ Resources:
         - Key: Name
           Value: !Ref VpcName
         - Key: Environnement
-          Value: !Ref Environnement
+          Value: !Ref Environment
 
   Subnet:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref Vpc
-      CidrBlock: !Ref SubnetCidr
-      AvailabilityZone: !Select [ 0, !GetAZs ""]
+      CidrBlock: !Ref SubnetCidr  # 10.0.1.0/24 par exemple
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
           Value: !Ref SubnetName
-        - Key: Environnement
-          Value: !Ref Environnement
+        - Key: Environment
+          Value: !Ref Environment
+
+  PrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.0.2.0/24
+      AvailabilityZone: !Select [ 1, !GetAZs "" ]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Ref PrivateSubnetName
+        - Key: Environment
+          Value: !Ref Environment
+
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
-    Properties: 
+    Properties:
       Tags:
         - Key: Name
           Value: !Sub "${VpcName}-igw"
         - Key: Environnement
-          Value: !Ref Environnement
+          Value: !Ref Environment
 
   AttachGateway:
     Type: AWS::EC2::VPCGatewayAttachment
-    Properties: 
+    Properties:
       VpcId: !Ref Vpc
       InternetGatewayId: !Ref InternetGateway
 
@@ -75,7 +93,7 @@ Resources:
         - Key: Name
           Value: !Sub "${VpcName}-rtb"
         - Key: Environnement
-          Value: !Ref Environnement
+          Value: !Ref Environment
 
   DefaultRoute:
     Type: AWS::EC2::Route
@@ -90,13 +108,28 @@ Resources:
       SubnetId: !Ref Subnet
       RouteTableId: !Ref RouteTable
 
-
 Outputs:
   VpcCidr:
     Description: Cidr du VPC créé
     Value: !Ref Vpc
+
   VpcId:
     Description: ID du VPC créé
     Value: !Ref Vpc
     Export:
       Name: !Sub "${AWS::StackName}-VpcId"
+
+  SubnetId:
+    Description: ID du subnet public
+    Value: !Ref Subnet
+    Export:
+      Name: !Sub "${AWS::StackName}-SubnetId"
+
+  PrivateSubnetId:
+    Description: ID du subnet privé
+    Value: !Ref PrivateSubnet
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnetId"
+
+
+
