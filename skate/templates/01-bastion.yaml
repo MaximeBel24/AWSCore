@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Bastion
+
+Parameters:
+  Environnement:
+    Type: String
+    AllowedValues: [prod, uat, dev]
+    Default: dev
+    Description: Environnement cible
+
+  KeyName:
+    Type: String
+    Description: Nom de la paire de clés EC2 existante
+
+  VpcStackName:
+    Type: String
+    Description: Nom de la stack VPC à importer
+
+Resources:
+  BastionSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Bastion SG - only reachable from Bastion
+      VpcId:
+        !ImportValue
+          Fn::Sub: "${VpcStackName}-VpcId"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0  # À restreindre pour la prod
+      Tags:
+        - Key: Name
+          Value: !Sub bastion-${Environnement}-sg
+        - Key: Environment
+          Value: !Ref Environnement
+
+  BastionHost:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      KeyName: !Ref KeyName
+      ImageId: ami-0caad95876a4611ee  # Amazon Linux 2023 (Paris)
+      SubnetId:
+        !ImportValue
+          Fn::Sub: "${VpcStackName}-SubnetId"
+      SecurityGroupIds:
+        - !Ref BastionSG
+      Tags:
+        - Key: Name
+          Value: !Sub bastion-${Environnement}
+        - Key: Environment
+          Value: !Ref Environnement
+
+Outputs:  
+  BastionSG:
+    Description: ID du Bastion Security Group
+    Value: !Ref BastionSG
+    Export:
+      Name: !Sub "${AWS::StackName}-BastionSG"
