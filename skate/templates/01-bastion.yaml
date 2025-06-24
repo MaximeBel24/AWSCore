@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: Bastion
 
 Parameters:
-  Environnement:
+  Environment:
     Type: String
     AllowedValues: [prod, uat, dev]
     Default: dev
@@ -15,6 +15,11 @@ Parameters:
   VpcStackName:
     Type: String
     Description: Nom de la stack VPC à importer
+
+  DevopsPassword:
+    Type: String
+    NoEcho: true
+    Description: Mot de passe pour l'utilisateur devops
 
 Resources:
   BastionSG:
@@ -31,9 +36,9 @@ Resources:
           CidrIp: 0.0.0.0/0  # À restreindre pour la prod
       Tags:
         - Key: Name
-          Value: !Sub bastion-${Environnement}-sg
+          Value: !Sub bastion-${Environment}-sg
         - Key: Environment
-          Value: !Ref Environnement
+          Value: !Ref Environment
 
   BastionHost:
     Type: AWS::EC2::Instance
@@ -43,14 +48,23 @@ Resources:
       ImageId: ami-0caad95876a4611ee  # Amazon Linux 2023 (Paris)
       SubnetId:
         !ImportValue
-          Fn::Sub: "${VpcStackName}-SubnetId"
+          Fn::Sub: "${VpcStackName}-PublicSubnetId"
       SecurityGroupIds:
         - !Ref BastionSG
       Tags:
         - Key: Name
-          Value: !Sub bastion-${Environnement}
+          Value: !Sub bastion-${Environment}
         - Key: Environment
-          Value: !Ref Environnement
+          Value: !Ref Environment
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y htop git vim
+          echo "Welcome to the bastion ${Environment}" > /etc/motd
+          useradd devops
+          passwd -l devops
+          echo 'UserData completed' >> /var/log/userdata.log
 
 Outputs:  
   BastionSG:
