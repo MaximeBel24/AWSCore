@@ -17,7 +17,7 @@ Parameters:
     Default: 10.0.0.0/16
     Description: CIDR du VPC
 
-  SubnetName:
+  PublicSubnetName:
     Type: String
     Description: Nom du Subnet public
 
@@ -43,7 +43,7 @@ Resources:
         - Key: Environnement
           Value: !Ref Environment
 
-  Subnet:
+  PublicSubnet:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref Vpc
@@ -52,7 +52,7 @@ Resources:
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
-          Value: !Ref SubnetName
+          Value: !Ref PublicSubnetName
         - Key: Environment
           Value: !Ref Environment
 
@@ -76,7 +76,7 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${VpcName}-igw"
-        - Key: Environnement
+        - Key: Environment
           Value: !Ref Environment
 
   AttachGateway:
@@ -92,7 +92,7 @@ Resources:
       Tags:
         - Key: Name
           Value: !Sub "${VpcName}-rtb"
-        - Key: Environnement
+        - Key: Environment
           Value: !Ref Environment
 
   DefaultRoute:
@@ -105,7 +105,7 @@ Resources:
   SubnetRouteTableAssociation:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
-      SubnetId: !Ref Subnet
+      SubnetId: !Ref PublicSubnet
       RouteTableId: !Ref RouteTable
 
 Outputs:
@@ -119,11 +119,11 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-VpcId"
 
-  SubnetId:
+  PublicSubnetId:
     Description: ID du subnet public
-    Value: !Ref Subnet
+    Value: !Ref PublicSubnet
     Export:
-      Name: !Sub "${AWS::StackName}-SubnetId"
+      Name: !Sub "${AWS::StackName}-PublicSubnetId"
 
   PrivateSubnetId:
     Description: ID du subnet privé
