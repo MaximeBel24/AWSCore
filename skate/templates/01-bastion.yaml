@@ -61,10 +61,8 @@ Resources:
           #!/bin/bash
           yum update -y
           yum install -y htop git vim
-          echo "Welcome to the bastion ${Environment}" > /etc/motd
           useradd devops
           passwd -l devops
-          echo 'UserData completed' >> /var/log/userdata.log
 
 Outputs:  
   BastionSG:
