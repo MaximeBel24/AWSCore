@@ -1,34 +1,34 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: VPC avec CIDR et tags en parametrer
+Description: VPC
 
 Parameters:
   VpcName:
     Type: String
-    Description: Nom du VPC
+    Description: Vpc name
 
   Environment:
     Type: String
     AllowedValues: [prod, uat, dev]
     Default: dev
-    Description: Environnement cible
+    Description: Target environment
 
   VpcCidr:
     Type: String
     Default: 10.0.0.0/16
-    Description: CIDR du VPC
+    Description: VPC CIDR
 
   PublicSubnetName:
     Type: String
-    Description: Nom du Subnet public
+    Description: Public subnet name
 
   PrivateSubnetName:
     Type: String
-    Description: Nom du Subnet privé
+    Description: Private subnet name
 
   SubnetCidr:
     Type: String
     Default: 10.0.1.0/24
-    Description: CIDR du subnet
+    Description: Subnet CIDR
 
 Resources:
   Vpc:
@@ -56,7 +56,7 @@ Resources:
         - Key: Environment
           Value: !Ref Environment
 
-  PrivateSubnet:
+  FirstPrivateSubnet:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref Vpc
@@ -65,10 +65,22 @@ Resources:
       MapPublicIpOnLaunch: false
       Tags:
         - Key: Name
-          Value: !Ref PrivateSubnetName
+          Value: !Sub "${PrivateSubnetName}-a"
         - Key: Environment
           Value: !Ref Environment
 
+  SecondPrivateSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: 10.0.3.0/24
+      AvailabilityZone: !Select [ 2, !GetAZs "" ]
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${PrivateSubnetName}-b"
+        - Key: Environment
+          Value: !Ref Environment
 
   InternetGateway:
     Type: AWS::EC2::InternetGateway
@@ -110,26 +122,32 @@ Resources:
 
 Outputs:
   VpcCidr:
-    Description: Cidr du VPC créé
+    Description: Cidr du VPC created
     Value: !Ref Vpc
 
   VpcId:
-    Description: ID du VPC créé
+    Description: VPC ID created
     Value: !Ref Vpc
     Export:
       Name: !Sub "${AWS::StackName}-VpcId"
 
   PublicSubnetId:
-    Description: ID du subnet public
+    Description: Public subnet ID
     Value: !Ref PublicSubnet
     Export:
       Name: !Sub "${AWS::StackName}-PublicSubnetId"
 
-  PrivateSubnetId:
-    Description: ID du subnet privé
-    Value: !Ref PrivateSubnet
+  FirstPrivateSubnetId:
+    Description: First private subnet ID
+    Value: !Ref FirstPrivateSubnet
     Export:
-      Name: !Sub "${AWS::StackName}-PrivateSubnetId"
+      Name: !Sub "${AWS::StackName}-FirstPrivateSubnetId"
+
+  SecondPrivateSubnetId:
+    Description: Second private subnet ID
+    Value: !Ref SecondPrivateSubnet
+    Export:
+      Name: !Sub "${AWS::StackName}-SecondPrivateSubnetId"
 
 
 
