@@ -1,0 +1,94 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description:  Deploy a private MySQL 8.0 RDS instance with its Security Group
+
+Parameters:
+  RdsName:
+    Type: String
+    Description: Rds name
+
+  Environment:
+    Type: String
+    AllowedValues: [prod, uat, dev]
+    Default: dev
+    Description: Target Environment
+
+  VpcStackName:
+    Type: String
+    Description: VPC stack name (to import VPC and Subnet)
+
+  DBUser:
+    Type: String
+    Default: admin
+    Description: Database admin user name
+
+  DBPassword:
+    Type: String
+    NoEcho: true
+    Description: Database admin password
+
+  BastionStackName:
+    Type: String
+    Description: Name of the Bastion Stack to be import
+
+Resources:
+  RdsSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allows MySQL access from Bastion
+      VpcId:
+        !ImportValue
+          Fn::Sub: "${VpcStackName}-VpcId"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId:
+            !ImportValue
+              Fn::Sub: "${BastionStackName}-BastionSG"
+      Tags:
+        - Key: Name
+          Value: !Sub "${RdsName}-${Environment}-sg"
+        - Key: Environment
+          Value: !Ref Environment
+
+  MySqlDBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: !Sub "${RdsName}-${Environment}"
+      Engine: mysql
+      EngineVersion: "8.0.42"
+      DBInstanceClass: db.t4g.micro
+      MasterUsername: !Ref DBUser
+      MasterUserPassword: !Ref DBPassword
+      AllocatedStorage: 20
+      VPCSecurityGroups:
+        - !Ref RdsSG
+      DBSubnetGroupName:
+        Ref: RdsSubnetGroup
+      PubliclyAccessible: false
+      MultiAZ: false
+      BackupRetentionPeriod: 1
+      StorageType: gp2
+
+  RdsSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Private subnets for RDS
+      SubnetIds:
+        - !ImportValue
+            Fn::Sub: "${VpcStackName}-FirstPrivateSubnetId"
+        - !ImportValue
+            Fn::Sub: "${VpcStackName}-SecondPrivateSubnetId"
+      Tags:
+        - Key: Name
+          Value: !Sub "${RdsName}-${Environment}-subnet-group"
+
+Outputs:
+  RdsEndpoint:
+    Description: RDS connection endpoint
+    Value: !GetAtt MySqlDBInstance.Endpoint.Address
+  RdsSGId:
+    Description: RDS SecurityGroup ID
+    Value: !Ref RdsSG
+    Export:
+      Name: !Sub "${AWS::StackName}-RdsSGId"
