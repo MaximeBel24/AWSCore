@@ -2,24 +2,28 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: Bastion
 
 Parameters:
+  BastionName:
+    Type: String
+    Description: Bastion name
+
   Environment:
     Type: String
     AllowedValues: [prod, uat, dev]
     Default: dev
-    Description: Environnement cible
+    Description: Target environment
 
   KeyName:
     Type: String
-    Description: Nom de la paire de clés EC2 existante
+    Description: Name of existing EC2 key pair
 
   VpcStackName:
     Type: String
-    Description: Nom de la stack VPC à importer
+    Description: Name of the VPC stack to be imported
 
   DevopsPassword:
     Type: String
     NoEcho: true
-    Description: Mot de passe pour l'utilisateur devops
+    Description: Password for devops user
 
 Resources:
   BastionSG:
@@ -36,7 +40,7 @@ Resources:
           CidrIp: 0.0.0.0/0  # À restreindre pour la prod
       Tags:
         - Key: Name
-          Value: !Sub bastion-${Environment}-sg
+          Value: !Sub "${BastionName}-${Environment}-ec2-sg"
         - Key: Environment
           Value: !Ref Environment
 
@@ -53,20 +57,22 @@ Resources:
         - !Ref BastionSG
       Tags:
         - Key: Name
-          Value: !Sub bastion-${Environment}
+          Value: !Sub "${BastionName}-${Environment}"
         - Key: Environment
           Value: !Ref Environment
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
-          yum update -y
-          yum install -y htop git vim
-          useradd devops
-          passwd -l devops
+          dnf install -y mariadb105
+          echo "Bastion ready with mariadb client for MySQL connections"
+#          yum update -y
+#          yum install -y htop git vim
+#          useradd devops
+#          passwd -l devops
 
 Outputs:  
-  BastionSG:
+  BastionSGId:
     Description: ID du Bastion Security Group
-    Value: !Ref BastionSG
+    Value: !GetAtt BastionSG.GroupId
     Export:
       Name: !Sub "${AWS::StackName}-BastionSG"
