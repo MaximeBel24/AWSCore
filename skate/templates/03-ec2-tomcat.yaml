@@ -1,0 +1,230 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Stack Tomcat 10 - EC2 / ASG / ALB / Route53
+
+Parameters:
+  StackName:
+    Type: String
+    Description: Stack name
+
+  Environment:
+    Type: String
+    AllowedValues: [prod, uat,dev]
+    Default: dev
+
+  VpcStackName:
+    Type: String
+    Description: Name of VPC stack for importing subnets
+
+  TomcatAMI:
+    Type: String
+    Description: AMI ID Amazon Linux 2023
+
+#  KeyName:
+#    Type: String
+#    Description: SSH key (optional, otherwise use SSM)
+
+  DomainName:
+    Type: String
+    Description: Route 53 domain name (e.g. tomcat.mondomaine.com)
+
+Resources:
+
+  #########################################
+  # IAM Role + Instance Profile pour EC2
+  #########################################
+  TomcatSSMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Tags:
+        - Key: Name
+          Value: !Sub "${StackName}-${Environment}-role"
+
+  TomcatInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub "${StackName}-${Environment}-instance-profile"
+      Roles:
+        - !Ref TomcatSSMRole
+
+  #########################################
+  # Security Groups
+  #########################################
+
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allows HTTP from the Internet
+      VpcId:
+        !ImportValue
+          Fn::Sub: "${VpcStackName}-VpcId"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub "${StackName}-${Environment}-sg-http"
+
+  TomcatSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allows ALB traffic to Tomcat
+      VpcId:
+        !ImportValue
+        Fn::Sub: "${VpcStackName}-VpcId"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0   # ou le CIDR de ton VPC si tu veux restreindre
+      Tags:
+        - Key: Name
+          Value: !Sub "${StackName}-${Environment}-sg-alb"
+
+  #########################################
+  # Launch Template pour EC2 Tomcat
+  #########################################
+
+  TomcatLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        ImageId: ami-0caad95876a4611ee  # Amazon Linux 2023 (Paris)
+        InstanceType: t3.micro
+#        KeyName: !Ref KeyName
+        IamInstanceProfile:
+          Name: !Ref TomcatInstanceProfile
+        SecurityGroupIds:
+          - !Ref TomcatSecurityGroup
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -xe
+            echo "TEST USERDATA OK" > /tmp/test-userdata.txt
+            yum update -y
+            yum install -y amazon-ssm-agent
+            systemctl enable amazon-ssm-agent
+            systemctl start amazon-ssm-agent
+            yum install -y java-17-amazon-corretto wget tar
+            wget https://dlcdn.apache.org/tomcat/tomcat-10/v10.1.43/bin/apache-tomcat-10.1.43.tar.gz -P /opt
+            tar -xzf /opt/apache-tomcat-10.1.43.tar.gz -C /opt
+            ln -s /opt/apache-tomcat-10.1.43 /opt/tomcat
+            chmod +x /opt/tomcat/bin/startup.sh
+            /opt/tomcat/bin/startup.sh
+        TagSpecifications:
+          - ResourceType: instance
+            Tags:
+              - Key: Name
+                Value: !Sub "${StackName}-${Environment}-instance"
+
+
+  #########################################
+  # Auto Scaling Group
+  #########################################
+
+  TomcatASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier:
+        - !ImportValue
+            Fn::Sub: "${VpcStackName}-FirstPrivateSubnetId"
+        - !ImportValue
+            Fn::Sub: "${VpcStackName}-SecondPrivateSubnetId"
+      LaunchTemplate:
+        LaunchTemplateId: !Ref TomcatLaunchTemplate
+        Version: !GetAtt TomcatLaunchTemplate.LatestVersionNumber
+      MinSize: 1
+      MaxSize: 3
+      DesiredCapacity: 1
+      TargetGroupARNs:
+        - !Ref TomcatTargetGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${StackName}-${Environment}-asg"
+          PropagateAtLaunch: true
+
+  #########################################
+  # ALB + Target Group + Listener
+  #########################################
+
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub "${StackName}-${Environment}-alb"
+      Scheme: internet-facing
+      Subnets:
+        - !ImportValue
+            Fn::Sub: "${VpcStackName}-FirstPublicSubnetId"
+        - !ImportValue
+            Fn::Sub: "${VpcStackName}-SecondPublicSubnetId"
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Tags:
+        - Key: Name
+          Value: !Sub "${StackName}-${Environment}-alb"
+
+  TomcatTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId:
+        !ImportValue
+          Fn::Sub: "${VpcStackName}-VpcId"
+      Port: 8080
+      Protocol: HTTP
+      TargetType: instance
+      HealthCheckProtocol: HTTP
+      HealthCheckPort: traffic-port
+      HealthCheckPath: /
+      Matcher:
+        HttpCode: 200
+      Tags:
+        - Key: Name
+          Value: !Sub "${StackName}-${Environment}-target-group"
+
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TomcatTargetGroup
+      LoadBalancerArn: !Ref ALB
+      Port: 80
+      Protocol: HTTP
+
+  #########################################
+  # Route 53 RecordSet
+  #########################################
+
+  TomcatDNSRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneName: !Ref DomainName
+      Name: !Sub "tomcat.${DomainName}"
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ALB.DNSName
+        HostedZoneId: Z3Q77PNBQS71R4
+
+Outputs:
+  ALBDNSName:
+    Description: ALB DNS
+    Value: !GetAtt ALB.DNSName
+
+  TomcatDNS:
+    Description: Route 53 domain name
+    Value: !Ref DomainName

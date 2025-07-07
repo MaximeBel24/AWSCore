@@ -1,0 +1,22 @@
+[
+  {
+    "ParameterKey": "StackName",
+    "ParameterValue": "awscore-tomcat"
+  },
+  {
+    "ParameterKey": "TomcatAMI",
+    "ParameterValue": "ami-0caad95876a4611ee"
+  },
+  {
+    "ParameterKey": "VpcStackName",
+    "ParameterValue": "awscore-vpc-uat"
+  },
+  {
+    "ParameterKey": "DomainName",
+    "ParameterValue": "maximebelin.com."
+  },
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "uat"
+  }
+]
