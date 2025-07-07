@@ -1,0 +1,27 @@
+[
+  {
+    "ParameterKey": "RdsName",
+    "ParameterValue": "awscore-rds"
+  },
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "uat"
+  },
+
+  {
+  "ParameterKey": "VpcStackName",
+  "ParameterValue": "awscore-vpc-uat"
+  },
+  {
+    "ParameterKey": "DBUser",
+    "ParameterValue": "admin"
+  },
+  {
+    "ParameterKey": "DBPassword",
+    "ParameterValue": "SuperMotDePasse"
+  },
+  {
+    "ParameterKey": "BastionStackName",
+    "ParameterValue": "awscore-bastion-uat"
+  }
+]
