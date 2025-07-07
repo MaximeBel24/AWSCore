@@ -12,9 +12,9 @@ Parameters:
     Default: dev
     Description: Target environment
 
-  KeyName:
-    Type: String
-    Description: Name of existing EC2 key pair
+#  KeyName:
+#    Type: String
+#    Description: Name of existing EC2 key pair
 
   VpcStackName:
     Type: String
@@ -26,6 +26,28 @@ Parameters:
     Description: Password for devops user
 
 Resources:
+  BastionSSMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Tags:
+        - Key: Name
+          Value: !Sub "${BastionName}-${Environment}-ssm-role"
+
+  BastionInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref BastionSSMRole
+
   BastionSG:
     Type: AWS::EC2::SecurityGroup
     Properties:
@@ -33,11 +55,12 @@ Resources:
       VpcId:
         !ImportValue
           Fn::Sub: "${VpcStackName}-VpcId"
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 0.0.0.0/0  # À restreindre pour la prod
+# Plus besoin d'ingress SSH ici
+#      SecurityGroupIngress:
+#        - IpProtocol: tcp
+#          FromPort: 22
+#          ToPort: 22
+#          CidrIp: 0.0.0.0/0  # À restreindre pour la prod
       Tags:
         - Key: Name
           Value: !Sub "${BastionName}-${Environment}-ec2-sg"
@@ -48,23 +71,29 @@ Resources:
     Type: AWS::EC2::Instance
     Properties:
       InstanceType: t2.micro
-      KeyName: !Ref KeyName
+#      KeyName: !Ref KeyName
       ImageId: ami-0caad95876a4611ee  # Amazon Linux 2023 (Paris)
       SubnetId:
         !ImportValue
-          Fn::Sub: "${VpcStackName}-PublicSubnetId"
+          Fn::Sub: "${VpcStackName}-FirstPublicSubnetId"
       SecurityGroupIds:
         - !Ref BastionSG
+      IamInstanceProfile: !Ref BastionInstanceProfile
       Tags:
         - Key: Name
           Value: !Sub "${BastionName}-${Environment}"
         - Key: Environment
           Value: !Ref Environment
+        - Key: SSM
+          Value: true
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash
           dnf install -y mariadb105
           echo "Bastion ready with mariadb client for MySQL connections"
+#          dnf install -y amazon-ssm-agent
+#          systemctl enable amazon-ssm-agent
+#          systemctl start amazon-ssm-agent
 #          yum update -y
 #          yum install -y htop git vim
 #          useradd devops

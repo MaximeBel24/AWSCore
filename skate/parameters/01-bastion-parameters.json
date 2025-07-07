@@ -1,0 +1,22 @@
+[
+  {
+    "ParameterKey": "BastionName",
+    "ParameterValue": "awscore-bastion"
+  },
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "uat"
+  },
+  {
+    "ParameterKey": "KeyName",
+    "ParameterValue": "bastion-key"
+  },
+  {
+    "ParameterKey": "VpcStackName",
+    "ParameterValue": "awscore-vpc-uat"
+  },
+  {
+    "ParameterKey": "DevopsPassword",
+    "ParameterValue": "Devops2025!"
+  }
+]
